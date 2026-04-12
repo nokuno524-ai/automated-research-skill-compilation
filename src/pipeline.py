@@ -22,10 +22,10 @@ def run_pipeline(paper_input: str, output_dir: str, use_llm: bool = False) -> di
     Returns:
         Dict with pipeline results and validation report
     """
-    from extractor import parse_arxiv_html, parse_markdown_paper, content_to_dict, save_content
-    from synthesizer import synthesize_from_content, save_spec
-    from skill_generator import generate_skill_directory
-    from validator import validate_skill_directory, format_validation_report
+    from src.extractor import parse_arxiv_html, parse_markdown_paper, content_to_dict, save_content
+    from src.synthesizer import synthesize_from_content, save_spec
+    from src.skill_generator import generate_skill_directory
+    from src.validator import validate_skill_directory, format_validation_report
     
     results = {"stages": {}}
     
@@ -81,34 +81,43 @@ We trained the Transformer on the WMT 2014 English-to-German and English-to-Fren
     logger.info(f"Extracted: {content.title} ({len(content.sections)} sections, {len(content.equations)} equations)")
     
     # Stage 2: Method Synthesis
-    logger.info("Stage 2: Method Synthesis")
-    spec = synthesize_from_content(content_dict)
-    spec_dict = json.loads(json.dumps(vars(spec)))  # serialize dataclass
-    results["stages"]["synthesis"] = {
-        "method_name": spec.name,
-        "category": spec.category,
-        "num_equations": len(spec.key_equations),
-    }
-    logger.info(f"Synthesized: {spec.name} (category: {spec.category})")
+    try:
+        logger.info("Stage 2: Method Synthesis")
+        spec = synthesize_from_content(content_dict)
+        spec_dict = json.loads(json.dumps(vars(spec)))  # serialize dataclass
+        results["stages"]["synthesis"] = {
+            "method_name": spec.name,
+            "category": spec.category,
+            "num_equations": len(spec.key_equations),
+        }
+        logger.info(f"Synthesized: {spec.name} (category: {spec.category})")
+    except Exception as e:
+        return {"error": str(e), "stage": "synthesis"}
     
     # Stage 3: Skill Generation
-    logger.info("Stage 3: Skill Generation")
-    os.makedirs(output_dir, exist_ok=True)
-    generate_skill_directory(spec_dict, output_dir)
-    results["stages"]["generation"] = {"output_dir": output_dir}
-    logger.info(f"Generated skill at {output_dir}")
+    try:
+        logger.info("Stage 3: Skill Generation")
+        os.makedirs(output_dir, exist_ok=True)
+        generate_skill_directory(spec_dict, output_dir)
+        results["stages"]["generation"] = {"output_dir": output_dir}
+        logger.info(f"Generated skill at {output_dir}")
+    except Exception as e:
+        return {"error": str(e), "stage": "generation"}
     
     # Stage 4: Validation
-    logger.info("Stage 4: Validation")
-    validation = validate_skill_directory(output_dir)
-    report = format_validation_report(validation, output_dir)
-    results["stages"]["validation"] = {
-        "overall_pass": validation.overall_pass,
-        "schema_compliant": validation.schema_compliant,
-        "completeness_score": validation.completeness_score,
-        "errors": validation.errors,
-    }
-    print(report)
+    try:
+        logger.info("Stage 4: Validation")
+        validation = validate_skill_directory(output_dir)
+        report = format_validation_report(validation, output_dir)
+        results["stages"]["validation"] = {
+            "overall_pass": validation.overall_pass,
+            "schema_compliant": validation.schema_compliant,
+            "completeness_score": validation.completeness_score,
+            "errors": validation.errors,
+        }
+        print(report)
+    except Exception as e:
+        return {"error": str(e), "stage": "validation"}
     
     return results
 

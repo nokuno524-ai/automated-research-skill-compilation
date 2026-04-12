@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Section:
+    """Represents a section in a research paper."""
     title: str
     level: int
     content: str
@@ -19,6 +20,7 @@ class Section:
 
 @dataclass
 class Equation:
+    """Represents an extracted LaTeX equation from a paper."""
     latex: str
     context: str  # surrounding text
     label: Optional[str] = None
@@ -26,6 +28,7 @@ class Equation:
 
 @dataclass
 class Algorithm:
+    """Represents a pseudocode algorithm parsed from a paper."""
     name: str
     description: str
     pseudocode: str
@@ -35,6 +38,7 @@ class Algorithm:
 
 @dataclass
 class PaperContent:
+    """Structured representation of a research paper's content."""
     title: str = ""
     authors: list = field(default_factory=list)
     abstract: str = ""
@@ -145,6 +149,12 @@ def parse_markdown_paper(md_text: str, url: str = "") -> PaperContent:
         current_section.content = '\n'.join(current_content).strip()
         content.sections.append(current_section)
     
+    # Set abstract explicitly by looking for the abstract section
+    for sec in content.sections:
+        if sec.title.lower() == 'abstract':
+            content.abstract = sec.content
+            break
+
     # Extract equations from markdown
     eq_pattern = re.compile(r'\$\$(.*?)\$\$', re.DOTALL)
     for m in eq_pattern.finditer(md_text):
