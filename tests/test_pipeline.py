@@ -59,8 +59,21 @@ def test_full_pipeline():
         assert result.has_skill_md, f"{paper_file}: Missing SKILL.md"
         assert result.has_method_script, f"{paper_file}: Missing method.py"
         assert result.completeness_score >= 0.5, f"{paper_file}: Low completeness {result.completeness_score}"
+
+        # New stage 4 checks
+        assert result.syntax_correct, f"{paper_file}: Syntax check failed"
+        assert result.functional_correct, f"{paper_file}: Functional check failed"
+        assert result.security_pass, f"{paper_file}: Security check failed"
     
     print(f"\n✓ Full pipeline test passed for {len(papers)} papers")
+
+
+def test_pipeline_file_not_found():
+    """Test pipeline handles non-existent files gracefully."""
+    from pipeline import run_pipeline
+    result = run_pipeline("nonexistent_file_path.md", "/tmp/dummy_out")
+    assert "error" in result
+    assert "File not found" in result["error"]
 
 
 def test_arxiv_id_extraction():
