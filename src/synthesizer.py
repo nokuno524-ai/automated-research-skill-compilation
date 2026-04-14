@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Hyperparameter:
+    """Represents a hyperparameter for a method."""
     name: str
     description: str
     default_value: str = ""
@@ -17,6 +18,7 @@ class Hyperparameter:
 
 @dataclass
 class MethodIO:
+    """Represents an input or output for a method."""
     name: str
     type: str
     description: str = ""
@@ -24,6 +26,7 @@ class MethodIO:
 
 @dataclass
 class MethodSpec:
+    """Structured specification of an extracted method."""
     name: str
     category: str  # architecture, training, optimization, loss_function, data_processing, evaluation
     summary: str  # 1-2 sentence description
@@ -78,13 +81,22 @@ def synthesize_from_content(paper_content: dict, method_name: str = "") -> Metho
     # Heuristic category detection
     category = "architecture"
     text_lower = (title + " " + abstract).lower()
-    if "loss" in text_lower or "objective" in text_lower:
-        category = "loss_function"
-    elif "optim" in text_lower or "gradient" in text_lower:
-        category = "optimization"
-    elif "train" in text_lower and ("strategy" in text_lower or "schedule" in text_lower):
+
+    category_keywords = {
+        "loss_function": ["loss", "objective"],
+        "optimization": ["optim", "gradient"],
+        "training": ["train strategy", "train schedule", "training strategy", "training schedule"],
+        "data_processing": ["data preprocess", "data augment", "preprocessing", "augmentation"]
+    }
+
+    for cat, keywords in category_keywords.items():
+        if any(kw in text_lower for kw in keywords):
+            category = cat
+            break
+
+    if category == "architecture" and "train" in text_lower and any(kw in text_lower for kw in ["strategy", "schedule"]):
         category = "training"
-    elif "data" in text_lower and ("preprocess" in text_lower or "augment" in text_lower):
+    if category == "architecture" and "data" in text_lower and any(kw in text_lower for kw in ["preprocess", "augment"]):
         category = "data_processing"
     
     if not method_name:
@@ -93,7 +105,7 @@ def synthesize_from_content(paper_content: dict, method_name: str = "") -> Metho
     spec = MethodSpec(
         name=method_name,
         category=category,
-        summary=abstract[:300] if abstract else "",
+        summary=abstract[:300] if abstract else (sections[0].get("content", "")[:300] if sections else ""),
         description=method_text[:2000],
         key_equations=key_eqs[:5],
         paper_title=title,
@@ -104,10 +116,12 @@ def synthesize_from_content(paper_content: dict, method_name: str = "") -> Metho
 
 
 def spec_to_dict(spec: MethodSpec) -> dict:
+    """Serialize MethodSpec to dict."""
     return asdict(spec)
 
 
 def save_spec(spec: MethodSpec, path: str):
+    """Save MethodSpec to JSON."""
     with open(path, 'w') as f:
         json.dump(spec_to_dict(spec), f, indent=2)
     logger.info(f"Saved method spec to {path}")

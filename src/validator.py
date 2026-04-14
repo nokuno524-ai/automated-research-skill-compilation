@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ValidationResult:
+    """Result of validating a generated skill directory."""
     schema_compliant: bool = False
     completeness_score: float = 0.0
     has_skill_md: bool = False
@@ -82,19 +83,45 @@ def validate_skill_directory(skill_dir: str) -> ValidationResult:
             with open(spec_path) as f:
                 spec = json.load(f)
             
-            required_fields = ["name", "category", "summary", "description", "paper_title"]
-            for field in required_fields:
-                if not spec.get(field):
+            required_fields = {
+                "name": str,
+                "category": str,
+                "summary": str,
+                "description": str,
+                "paper_title": str,
+            }
+            for field, type_ in required_fields.items():
+                if field not in spec or not spec.get(field):
                     result.errors.append(f"MethodSpec missing required field: {field}")
+                elif not isinstance(spec.get(field), type_):
+                    result.errors.append(f"MethodSpec field '{field}' has wrong type, expected {type_.__name__}")
         except json.JSONDecodeError as e:
             result.errors.append(f"Invalid JSON in method_spec.json: {e}")
+
+    # Functional testing
+    val_script_path = os.path.join(skill_dir, "scripts", "validate.py")
+    if os.path.exists(val_script_path):
+        import subprocess
+        try:
+            proc = subprocess.run(["python", val_script_path], capture_output=True, text=True, timeout=10)
+            if proc.returncode != 0:
+                result.errors.append(f"Validation script execution failed: {proc.stderr}")
+        except Exception as e:
+            result.errors.append(f"Failed to execute validation script: {e}")
     
-    # Calculate completeness score
-    total_checks = len(REQUIRED_FILES) + len(REQUIRED_SKILL_SECTIONS)
+    # Calculate completeness score with functional tests and schemas
+    total_checks = len(REQUIRED_FILES) + len(REQUIRED_SKILL_SECTIONS) + 2  # +2 for schema compliant and no execution errors
     passed = len(result.skill_md_sections) + sum([
         result.has_skill_md, result.has_method_script, 
         result.has_validation_script, result.has_spec_json, result.has_readme
     ])
+
+    no_execution_errors = 1 if not any("Validation script execution failed" in e for e in result.errors) else 0
+    passed += no_execution_errors
+
+    schema_ok = 1 if not any("MethodSpec" in e for e in result.errors) else 0
+    passed += schema_ok
+
     result.completeness_score = passed / total_checks if total_checks > 0 else 0.0
     
     # Schema compliance

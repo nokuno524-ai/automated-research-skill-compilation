@@ -162,7 +162,8 @@ def generate_method_script(spec: dict) -> str:
 def generate_validation_script(spec: dict) -> str:
     """Generate validation/test script."""
     name = spec.get("name", "Method")
-    test_code = "model = MethodModule()\n    x = torch.randn(2, 10)\n    out = model(x)\n    assert out.shape[0] == 2"
+    class_name = name.replace(" ", "").replace("-", "") + "Module"
+    test_code = f"model = {class_name}()\n    x = torch.randn(2, 10)\n    out = model(x)\n    assert out.shape[0] == 2"
     
     return VALIDATION_SCRIPT_TEMPLATE.format(
         name=name,
