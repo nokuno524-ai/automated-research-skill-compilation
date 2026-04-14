@@ -7,8 +7,12 @@ from dataclasses import dataclass, field
 logger = logging.getLogger(__name__)
 
 
+import ast
+import subprocess
+
 @dataclass
 class ValidationResult:
+    """Represents the results of the 4th stage validation of a generated skill."""
     schema_compliant: bool = False
     completeness_score: float = 0.0
     has_skill_md: bool = False
@@ -16,6 +20,9 @@ class ValidationResult:
     has_validation_script: bool = False
     has_spec_json: bool = False
     has_readme: bool = False
+    syntax_correct: bool = False
+    functional_correct: bool = False
+    security_pass: bool = False
     skill_md_sections: list = field(default_factory=list)
     missing_sections: list = field(default_factory=list)
     errors: list = field(default_factory=list)
@@ -40,6 +47,53 @@ REQUIRED_FILES = [
     "references/method_spec.json",
     "README.md",
 ]
+
+
+def check_syntax(script_path: str) -> bool:
+    """Check if the python script has valid syntax."""
+    if not os.path.exists(script_path):
+        return False
+    try:
+        with open(script_path) as f:
+            ast.parse(f.read())
+        return True
+    except SyntaxError:
+        return False
+
+
+def check_functional(script_path: str, skill_dir: str) -> bool:
+    """Check if the validation script executes successfully."""
+    abs_script_path = os.path.join(skill_dir, script_path) if not os.path.isabs(script_path) else script_path
+    if not os.path.exists(abs_script_path):
+        return False
+    try:
+        # Run in a subprocess
+        proc = subprocess.run(["python", script_path], cwd=skill_dir, capture_output=True, text=True)
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
+def check_security(script_path: str) -> bool:
+    """Check for dangerous imports in generated code."""
+    if not os.path.exists(script_path):
+        return False
+    try:
+        with open(script_path) as f:
+            tree = ast.parse(f.read())
+
+        dangerous_imports = {"os", "sys", "subprocess", "shlex", "pty"}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.split('.')[0] in dangerous_imports:
+                        return False
+            elif isinstance(node, ast.ImportFrom):
+                if node.module and node.module.split('.')[0] in dangerous_imports:
+                    return False
+        return True
+    except SyntaxError:
+        return False
 
 
 def validate_skill_directory(skill_dir: str) -> ValidationResult:
@@ -100,12 +154,27 @@ def validate_skill_directory(skill_dir: str) -> ValidationResult:
     # Schema compliance
     result.schema_compliant = len(result.errors) == 0 and result.completeness_score >= 0.7
     
+    # Run advanced checks if scripts exist
+    method_script_path = os.path.join(skill_dir, "scripts", "method.py")
+    if result.has_method_script:
+        result.syntax_correct = check_syntax(method_script_path)
+        result.security_pass = check_security(method_script_path)
+
+    validation_script_path = os.path.join(skill_dir, "scripts", "validate.py")
+    if result.has_validation_script and result.syntax_correct:
+        # also check syntax of validation script
+        if check_syntax(validation_script_path):
+            result.functional_correct = check_functional("scripts/validate.py", skill_dir)
+
     # Overall pass
     result.overall_pass = (
         result.schema_compliant
         and result.has_skill_md
         and result.has_method_script
         and result.completeness_score >= 0.6
+        and result.syntax_correct
+        and result.functional_correct
+        and result.security_pass
     )
     
     return result
@@ -125,6 +194,11 @@ def format_validation_report(result: ValidationResult, skill_dir: str) -> str:
         f"  scripts/validate.py: {'✅' if result.has_validation_script else '❌'}",
         f"  references/method_spec.json: {'✅' if result.has_spec_json else '❌'}",
         f"  README.md: {'✅' if result.has_readme else '❌'}",
+        "",
+        f"Checks:",
+        f"  Syntax Valid: {'✅' if result.syntax_correct else '❌'}",
+        f"  Functional Valid: {'✅' if result.functional_correct else '❌'}",
+        f"  Security Pass: {'✅' if result.security_pass else '❌'}",
         "",
         f"SKILL.md Sections Found: {', '.join(result.skill_md_sections) or 'None'}",
         f"SKILL.md Sections Missing: {', '.join(result.missing_sections) or 'None'}",

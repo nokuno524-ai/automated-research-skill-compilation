@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Section:
+    """Represents a section in a research paper."""
     title: str
     level: int
     content: str
@@ -19,6 +20,7 @@ class Section:
 
 @dataclass
 class Equation:
+    """Represents an extracted mathematical equation."""
     latex: str
     context: str  # surrounding text
     label: Optional[str] = None
@@ -26,6 +28,7 @@ class Equation:
 
 @dataclass
 class Algorithm:
+    """Represents an extracted algorithm or pseudocode."""
     name: str
     description: str
     pseudocode: str
@@ -35,6 +38,7 @@ class Algorithm:
 
 @dataclass
 class PaperContent:
+    """Represents the complete parsed content of a research paper."""
     title: str = ""
     authors: list = field(default_factory=list)
     abstract: str = ""
@@ -144,6 +148,11 @@ def parse_markdown_paper(md_text: str, url: str = "") -> PaperContent:
     if current_section:
         current_section.content = '\n'.join(current_content).strip()
         content.sections.append(current_section)
+
+    for sec in content.sections:
+        if sec.title.lower() == 'abstract':
+            content.abstract = sec.content
+            break
     
     # Extract equations from markdown
     eq_pattern = re.compile(r'\$\$(.*?)\$\$', re.DOTALL)
@@ -157,12 +166,26 @@ def parse_markdown_paper(md_text: str, url: str = "") -> PaperContent:
 
 
 def content_to_dict(content: PaperContent) -> dict:
-    """Serialize PaperContent to dict."""
+    """
+    Serialize PaperContent to dict.
+
+    Args:
+        content: The parsed PaperContent.
+
+    Returns:
+        Dict representation of the content.
+    """
     return asdict(content)
 
 
-def save_content(content: PaperContent, path: str):
-    """Save PaperContent to JSON."""
+def save_content(content: PaperContent, path: str) -> None:
+    """
+    Save PaperContent to JSON file.
+
+    Args:
+        content: The parsed PaperContent.
+        path: Destination file path.
+    """
     with open(path, 'w') as f:
         json.dump(content_to_dict(content), f, indent=2)
     logger.info(f"Saved paper content to {path}")

@@ -2,18 +2,39 @@
 
 Automated pipeline that converts research papers into structured, validated skill artifacts for AI agent consumption.
 
-## Quick Start
+## Setup Instructions
+
+Ensure you have Python 3.8+ installed. Install the necessary dependencies, especially `torch` and `numpy` which are required for validation tests.
+
+```bash
+# Install required dependencies
+pip install torch numpy pytest
+
+# Set PYTHONPATH
+export PYTHONPATH=src
+```
+
+## Quick Start / Usage Examples
 
 ```bash
 # Run on a local markdown paper
-python src/cli.py examples/attention_paper.md -o output/transformer-skill
+python src/pipeline.py examples/attention_paper.md -o output/transformer-skill
 
 # Run on a local LoRA paper
-python src/cli.py examples/lora_paper.md -o output/lora-skill
+python src/pipeline.py examples/lora_paper.md -o output/lora-skill
 
-# Run tests
-python tests/test_pipeline.py
+# Run with LLM enhanced extraction (Future/Mocked)
+python src/pipeline.py examples/lora_paper.md -o output/lora-skill --use_llm
+
+# Run all automated tests
+PYTHONPATH=src pytest tests/
 ```
+
+## Troubleshooting
+
+- **`ModuleNotFoundError: No module named 'torch'`**: Make sure you have `torch` installed via `pip install torch`. The validation stage executes generated scripts which require it.
+- **File not found errors**: Ensure the path to the paper (`examples/attention_paper.md`) is correct and relative to your current working directory.
+- **Validation fails functionally**: Check `output/<skill-name>/scripts/method.py` to ensure the generated code has valid syntax and logic.
 
 ## Architecture
 
@@ -21,10 +42,13 @@ python tests/test_pipeline.py
 Paper → Content Extraction → Method Synthesis → Skill Generation → Validation
 ```
 
-1. **Content Extraction** (`src/extractor.py`): Parse markdown/HTML papers into structured content
-2. **Method Synthesis** (`src/synthesizer.py`): Extract method specifications from content
-3. **Skill Generation** (`src/skill_generator.py`): Generate SKILL.md, scripts, and references
-4. **Validation** (`src/validator.py`): Validate generated skills against quality criteria
+1. **Content Extraction** (`src/extractor.py`): Parse markdown/HTML papers into structured content.
+2. **Method Synthesis** (`src/synthesizer.py`): Extract method specifications from content.
+3. **Skill Generation** (`src/skill_generator.py`): Generate SKILL.md, scripts, and references.
+4. **Validation** (`src/validator.py`): Validate generated skills against quality criteria. This includes automated checking for:
+   - **Syntax correctness** using `ast.parse`.
+   - **Functional correctness** by executing validation tests.
+   - **Security** by ensuring no unsafe imports (e.g. `os`, `sys`, `subprocess`) are in the generated code.
 
 ## Output Structure
 

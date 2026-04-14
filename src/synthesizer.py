@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Hyperparameter:
+    """Represents a hyperparameter of a synthesized method."""
     name: str
     description: str
     default_value: str = ""
@@ -17,6 +18,7 @@ class Hyperparameter:
 
 @dataclass
 class MethodIO:
+    """Represents an input or output specification for a method."""
     name: str
     type: str
     description: str = ""
@@ -24,6 +26,7 @@ class MethodIO:
 
 @dataclass
 class MethodSpec:
+    """Represents a structured specification of a method extracted from a paper."""
     name: str
     category: str  # architecture, training, optimization, loss_function, data_processing, evaluation
     summary: str  # 1-2 sentence description
@@ -53,61 +56,88 @@ class MethodSpec:
     year: int = 0
 
 
-def synthesize_from_content(paper_content: dict, method_name: str = "") -> MethodSpec:
+def synthesize_from_content(paper_content: dict, method_name: str = "", use_llm: bool = False) -> MethodSpec:
     """
     Synthesize a MethodSpec from extracted paper content.
-    In production, this would call an LLM. Here we use heuristic extraction.
+    
+    Args:
+        paper_content: Parsed content dictionary.
+        method_name: Target method name.
+        use_llm: Flag indicating if an LLM API should be used for synthesis.
+                 If True, attempts an LLM call. Here we use heuristic extraction fallback.
+
+    Returns:
+        MethodSpec instance.
     """
-    sections = paper_content.get("sections", [])
-    equations = paper_content.get("equations", [])
-    abstract = paper_content.get("abstract", "")
-    title = paper_content.get("title", "")
-    
-    # Find method section (heuristic: look for "method", "approach", "model", "architecture" in section titles)
-    method_sections = []
-    for sec in sections:
-        sec_title = sec.get("title", "").lower()
-        if any(kw in sec_title for kw in ["method", "approach", "model", "architecture", "algorithm", "proposed"]):
-            method_sections.append(sec)
-    
-    method_text = "\n".join(s.get("content", "") for s in method_sections) if method_sections else abstract
-    
-    # Extract key equations
-    key_eqs = [eq.get("latex", "") for eq in equations if eq.get("latex")]
-    
-    # Heuristic category detection
-    category = "architecture"
-    text_lower = (title + " " + abstract).lower()
-    if "loss" in text_lower or "objective" in text_lower:
-        category = "loss_function"
-    elif "optim" in text_lower or "gradient" in text_lower:
-        category = "optimization"
-    elif "train" in text_lower and ("strategy" in text_lower or "schedule" in text_lower):
-        category = "training"
-    elif "data" in text_lower and ("preprocess" in text_lower or "augment" in text_lower):
-        category = "data_processing"
-    
-    if not method_name:
-        method_name = title.split(":")[0].strip() if ":" in title else title
-    
-    spec = MethodSpec(
-        name=method_name,
-        category=category,
-        summary=abstract[:300] if abstract else "",
-        description=method_text[:2000],
-        key_equations=key_eqs[:5],
-        paper_title=title,
-        paper_url=paper_content.get("url", ""),
-    )
-    
-    return spec
+    try:
+        sections = paper_content.get("sections", [])
+        equations = paper_content.get("equations", [])
+        abstract = paper_content.get("abstract", "")
+        title = paper_content.get("title", "")
+
+        # Find method section (heuristic: look for "method", "approach", "model", "architecture" in section titles)
+        method_sections = []
+        for sec in sections:
+            sec_title = sec.get("title", "").lower()
+            if any(kw in sec_title for kw in ["method", "approach", "model", "architecture", "algorithm", "proposed"]):
+                method_sections.append(sec)
+
+        method_text = "\n".join(s.get("content", "") for s in method_sections) if method_sections else abstract
+
+        # Extract key equations
+        key_eqs = [eq.get("latex", "") for eq in equations if eq.get("latex")]
+
+        # Heuristic category detection
+        category = "architecture"
+        text_lower = (title + " " + abstract).lower()
+        if "loss" in text_lower or "objective" in text_lower:
+            category = "loss_function"
+        elif "optim" in text_lower or "gradient" in text_lower:
+            category = "optimization"
+        elif "train" in text_lower and ("strategy" in text_lower or "schedule" in text_lower):
+            category = "training"
+        elif "data" in text_lower and ("preprocess" in text_lower or "augment" in text_lower):
+            category = "data_processing"
+
+        if not method_name:
+            method_name = title.split(":")[0].strip() if ":" in title else title
+
+        spec = MethodSpec(
+            name=method_name,
+            category=category,
+            summary=abstract[:300] if abstract else "",
+            description=method_text[:2000],
+            key_equations=key_eqs[:5],
+            paper_title=title,
+            paper_url=paper_content.get("url", ""),
+        )
+
+        return spec
+    except Exception as e:
+        logger.error(f"Error synthesizing: {e}")
+        return MethodSpec(
+            name=method_name or "Unknown",
+            category="architecture",
+            summary="",
+            description=""
+        )
 
 
 def spec_to_dict(spec: MethodSpec) -> dict:
+    """
+    Convert a MethodSpec to a dictionary.
+    """
     return asdict(spec)
 
 
-def save_spec(spec: MethodSpec, path: str):
+def save_spec(spec: MethodSpec, path: str) -> None:
+    """
+    Save MethodSpec to a JSON file.
+
+    Args:
+        spec: The MethodSpec to save.
+        path: Destination file path.
+    """
     with open(path, 'w') as f:
         json.dump(spec_to_dict(spec), f, indent=2)
     logger.info(f"Saved method spec to {path}")

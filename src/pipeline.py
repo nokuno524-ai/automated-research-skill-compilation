@@ -32,14 +32,15 @@ def run_pipeline(paper_input: str, output_dir: str, use_llm: bool = False) -> di
     # Stage 1: Content Extraction
     logger.info("Stage 1: Content Extraction")
     
-    if paper_input.startswith("http"):
-        # Try to fetch from web (placeholder - in production would use web_fetch or arxiv API)
-        logger.warning("URL fetching not implemented in prototype. Provide local file.")
-        # For prototype, create sample content
-        if "1706.03762" in paper_input:
-            raw = open("examples/attention_paper.md").read() if os.path.exists("examples/attention_paper.md") else ""
-            if not raw:
-                raw = """# Attention Is All You Need
+    try:
+        if paper_input.startswith("http"):
+            # Try to fetch from web (placeholder - in production would use web_fetch or arxiv API)
+            logger.warning("URL fetching not implemented in prototype. Provide local file.")
+            # For prototype, create sample content
+            if "1706.03762" in paper_input:
+                raw = open("examples/attention_paper.md").read() if os.path.exists("examples/attention_paper.md") else ""
+                if not raw:
+                    raw = """# Attention Is All You Need
 
 ## Abstract
 We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.
@@ -59,17 +60,20 @@ where $\\text{head}_i = \\text{Attention}(QW_i^Q, KW_i^K, VW_i^V)$
 ## 5 Training
 We trained the Transformer on the WMT 2014 English-to-German and English-to-French translation tasks.
 """
-            content = parse_markdown_paper(raw, url=paper_input)
+                content = parse_markdown_paper(raw, url=paper_input)
+            else:
+                return {"error": "URL fetching not implemented. Provide local file."}
+        elif paper_input.endswith('.html'):
+            with open(paper_input) as f:
+                raw = f.read()
+            content = parse_arxiv_html(raw, url=paper_input)
         else:
-            return {"error": "URL fetching not implemented. Provide local file."}
-    elif paper_input.endswith('.html'):
-        with open(paper_input) as f:
-            raw = f.read()
-        content = parse_arxiv_html(raw, url=paper_input)
-    else:
-        with open(paper_input) as f:
-            raw = f.read()
-        content = parse_markdown_paper(raw, url=paper_input)
+            with open(paper_input) as f:
+                raw = f.read()
+            content = parse_markdown_paper(raw, url=paper_input)
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {e}")
+        return {"error": f"File not found: {e}"}
     
     content_dict = content_to_dict(content)
     results["stages"]["extraction"] = {
@@ -82,7 +86,7 @@ We trained the Transformer on the WMT 2014 English-to-German and English-to-Fren
     
     # Stage 2: Method Synthesis
     logger.info("Stage 2: Method Synthesis")
-    spec = synthesize_from_content(content_dict)
+    spec = synthesize_from_content(content_dict, use_llm=use_llm)
     spec_dict = json.loads(json.dumps(vars(spec)))  # serialize dataclass
     results["stages"]["synthesis"] = {
         "method_name": spec.name,
