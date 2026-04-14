@@ -160,16 +160,9 @@ def generate_method_script(spec: dict) -> str:
 
 
 def generate_validation_script(spec: dict) -> str:
-    """
-    Generate validation/test script.
-
-    Args:
-        spec: MethodSpec as a dictionary.
-    Returns:
-        Python script string for validation.
-    """
+    """Generate validation/test script."""
     name = spec.get("name", "Method")
-    class_name = f"{name.replace(' ', '').replace('-', '')}Module"
+    class_name = name.replace(" ", "").replace("-", "") + "Module"
     test_code = f"model = {class_name}()\n    x = torch.randn(2, 10)\n    out = model(x)\n    assert out.shape[0] == 2"
     
     return VALIDATION_SCRIPT_TEMPLATE.format(
@@ -184,38 +177,35 @@ def generate_skill_directory(spec: dict, output_dir: str):
     os.makedirs(os.path.join(output_dir, "scripts"), exist_ok=True)
     os.makedirs(os.path.join(output_dir, "references"), exist_ok=True)
     
-    try:
-        # SKILL.md
-        skill_md = generate_skill_md(spec)
-        with open(os.path.join(output_dir, "SKILL.md"), 'w') as f:
-            f.write(skill_md)
-        logger.info(f"Generated SKILL.md")
-
-        # Method implementation
-        method_script = generate_method_script(spec)
-        with open(os.path.join(output_dir, "scripts", "method.py"), 'w') as f:
-            f.write(method_script)
-        logger.info(f"Generated scripts/method.py")
-
-        # Validation script
-        val_script = generate_validation_script(spec)
-        with open(os.path.join(output_dir, "scripts", "validate.py"), 'w') as f:
-            f.write(val_script)
-        logger.info(f"Generated scripts/validate.py")
-
-        # Save spec as reference
-        with open(os.path.join(output_dir, "references", "method_spec.json"), 'w') as f:
-            json.dump(spec, f, indent=2)
-        logger.info(f"Generated references/method_spec.json")
-
-        # README
-        readme = f"# {spec.get('name', 'Generated Skill')}\n\nAuto-generated skill from paper-to-skill pipeline.\n\nSee SKILL.md for full details.\n"
-        with open(os.path.join(output_dir, "README.md"), 'w') as f:
-            f.write(readme)
-
-        logger.info(f"Skill directory generated at {output_dir}")
-    except IOError as e:
-        logger.error(f"Failed to write file: {e}")
+    # SKILL.md
+    skill_md = generate_skill_md(spec)
+    with open(os.path.join(output_dir, "SKILL.md"), 'w') as f:
+        f.write(skill_md)
+    logger.info(f"Generated SKILL.md")
+    
+    # Method implementation
+    method_script = generate_method_script(spec)
+    with open(os.path.join(output_dir, "scripts", "method.py"), 'w') as f:
+        f.write(method_script)
+    logger.info(f"Generated scripts/method.py")
+    
+    # Validation script
+    val_script = generate_validation_script(spec)
+    with open(os.path.join(output_dir, "scripts", "validate.py"), 'w') as f:
+        f.write(val_script)
+    logger.info(f"Generated scripts/validate.py")
+    
+    # Save spec as reference
+    with open(os.path.join(output_dir, "references", "method_spec.json"), 'w') as f:
+        json.dump(spec, f, indent=2)
+    logger.info(f"Generated references/method_spec.json")
+    
+    # README
+    readme = f"# {spec.get('name', 'Generated Skill')}\n\nAuto-generated skill from paper-to-skill pipeline.\n\nSee SKILL.md for full details.\n"
+    with open(os.path.join(output_dir, "README.md"), 'w') as f:
+        f.write(readme)
+    
+    logger.info(f"Skill directory generated at {output_dir}")
 
 
 if __name__ == "__main__":
