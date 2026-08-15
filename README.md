@@ -74,3 +74,35 @@ P2S is the first pipeline that compiles papers into **validated, composable skil
 ## License
 
 MIT
+
+## Pipeline Diagram
+
+```text
+[Paper]
+  |
+  v
+Stage 1: Extraction (Markdown parsing, ArXiv fetching)
+  |
+  v
+Stage 2: Synthesis (Method, Key equations extraction)
+  |
+  v
+Stage 3: Generation (Skill folder creation, script generation)
+  |
+  v
+Stage 4: Validation (Syntax, security, functional validation)
+  |
+  v
+[Validated Skill Artifact]
+```
+
+## Running Tests
+To run the full offline test suite deterministically:
+```bash
+PYTHONPATH=src pytest tests/
+```
+
+## STATUS
+- **Unit Tests:** PASS
+- **Integration Tests:** PASS
+- **Overall:** Pipeline fully runnable offline

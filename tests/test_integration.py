@@ -36,3 +36,21 @@ def test_stage_isolation_synthesis(mock_paper_content):
     spec = synthesize_from_content(content_to_dict(mock_paper_content))
     assert spec.name == "Mock Title"
     assert spec.summary == "Mock abstract."
+
+def test_pipeline_tiny_paper(monkeypatch):
+    from src.pipeline import run_pipeline
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        result = run_pipeline("tests/fixtures/tiny_paper.md", temp_dir)
+        assert "error" not in result
+
+        stages = result.get("stages", {})
+        assert "extraction" in stages
+        assert "synthesis" in stages
+        assert "generation" in stages
+        assert "validation" in stages
+
+        validation = stages["validation"]
+        assert validation["overall_pass"] is True
+        assert validation["schema_compliant"] is True

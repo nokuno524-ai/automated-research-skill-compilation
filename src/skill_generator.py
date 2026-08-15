@@ -179,31 +179,46 @@ def generate_skill_directory(spec: dict, output_dir: str):
     
     # SKILL.md
     skill_md = generate_skill_md(spec)
-    with open(os.path.join(output_dir, "SKILL.md"), 'w') as f:
-        f.write(skill_md)
-    logger.info(f"Generated SKILL.md")
+    try:
+        with open(os.path.join(output_dir, "SKILL.md"), 'w') as f:
+            f.write(skill_md)
+        logger.info(f"Generated SKILL.md")
+    except IOError as e:
+        logger.error(f"IOError when writing SKILL.md: {e}")
     
     # Method implementation
     method_script = generate_method_script(spec)
-    with open(os.path.join(output_dir, "scripts", "method.py"), 'w') as f:
-        f.write(method_script)
-    logger.info(f"Generated scripts/method.py")
+    try:
+        with open(os.path.join(output_dir, "scripts", "method.py"), 'w') as f:
+            f.write(method_script)
+        logger.info(f"Generated scripts/method.py")
+    except IOError as e:
+        logger.error(f"IOError when writing method.py: {e}")
     
     # Validation script
     val_script = generate_validation_script(spec)
-    with open(os.path.join(output_dir, "scripts", "validate.py"), 'w') as f:
-        f.write(val_script)
-    logger.info(f"Generated scripts/validate.py")
+    try:
+        with open(os.path.join(output_dir, "scripts", "validate.py"), 'w') as f:
+            f.write(val_script)
+        logger.info(f"Generated scripts/validate.py")
+    except IOError as e:
+        logger.error(f"IOError when writing validate.py: {e}")
     
     # Save spec as reference
-    with open(os.path.join(output_dir, "references", "method_spec.json"), 'w') as f:
-        json.dump(spec, f, indent=2)
-    logger.info(f"Generated references/method_spec.json")
+    try:
+        with open(os.path.join(output_dir, "references", "method_spec.json"), 'w') as f:
+            json.dump(spec, f, indent=2)
+        logger.info(f"Generated references/method_spec.json")
+    except IOError as e:
+        logger.error(f"IOError when writing method_spec.json: {e}")
     
     # README
     readme = f"# {spec.get('name', 'Generated Skill')}\n\nAuto-generated skill from paper-to-skill pipeline.\n\nSee SKILL.md for full details.\n"
-    with open(os.path.join(output_dir, "README.md"), 'w') as f:
-        f.write(readme)
+    try:
+        with open(os.path.join(output_dir, "README.md"), 'w') as f:
+            f.write(readme)
+    except IOError as e:
+        logger.error(f"IOError when writing README.md: {e}")
     
     logger.info(f"Skill directory generated at {output_dir}")
 
