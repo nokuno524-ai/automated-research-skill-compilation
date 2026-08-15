@@ -67,8 +67,11 @@ We trained the Transformer on the WMT 2014 English-to-German and English-to-Fren
             raw = f.read()
         content = parse_arxiv_html(raw, url=paper_input)
     else:
-        with open(paper_input) as f:
-            raw = f.read()
+        try:
+            with open(paper_input) as f:
+                raw = f.read()
+        except FileNotFoundError as e:
+            return {"error": f"File not found: {e}", "stage": "extraction"}
         content = parse_markdown_paper(raw, url=paper_input)
     
     content_dict = content_to_dict(content)
@@ -113,6 +116,7 @@ We trained the Transformer on the WMT 2014 English-to-German and English-to-Fren
             "overall_pass": validation.overall_pass,
             "schema_compliant": validation.schema_compliant,
             "completeness_score": validation.completeness_score,
+            "scores": validation.scores if hasattr(validation, 'scores') else {},
             "errors": validation.errors,
         }
         print(report)

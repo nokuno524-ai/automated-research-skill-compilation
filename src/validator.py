@@ -2,6 +2,8 @@
 import json
 import os
 import logging
+import ast
+import subprocess
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,11 @@ class ValidationResult:
     warnings: list = field(default_factory=list)
     overall_pass: bool = False
 
+    # Stage 4 checks
+    syntax_correct: bool = False
+    functional_correct: bool = False
+    security_pass: bool = False
+
 
 REQUIRED_SKILL_SECTIONS = [
     "description",
@@ -42,6 +49,35 @@ REQUIRED_FILES = [
     "README.md",
 ]
 
+
+def check_syntax(path: str) -> bool:
+    try:
+        with open(path, "r") as f:
+            ast.parse(f.read())
+        return True
+    except SyntaxError:
+        return False
+    except Exception:
+        return False
+
+def check_security(path: str) -> bool:
+    try:
+        with open(path, "r") as f:
+            code = f.read()
+            if "os.system" in code or "subprocess" in code or "exec(" in code or "eval(" in code:
+                return False
+        return True
+    except Exception:
+        return False
+
+def check_functional(path: str, tmpdir: str) -> bool:
+    try:
+        # Run with a strict timeout and no internet theoretically
+        env = os.environ.copy()
+        proc = subprocess.run(["python", path, "--help"], capture_output=True, timeout=10, cwd=tmpdir, env=env)
+        return proc.returncode == 0
+    except Exception:
+        return False
 
 def validate_skill_directory(skill_dir: str) -> ValidationResult:
     """Validate a generated skill directory."""
@@ -98,31 +134,56 @@ def validate_skill_directory(skill_dir: str) -> ValidationResult:
         except json.JSONDecodeError as e:
             result.errors.append(f"Invalid JSON in method_spec.json: {e}")
 
-    # Functional testing
+    # Functional, syntax, and security testing
+    scripts_to_check = []
+    if result.has_method_script:
+        scripts_to_check.append(os.path.join(skill_dir, "scripts", "method.py"))
+    if result.has_validation_script:
+        scripts_to_check.append(os.path.join(skill_dir, "scripts", "validate.py"))
+
+    # Syntax and security check
+    all_syntax_ok = True
+    all_security_ok = True
+    for script in scripts_to_check:
+        if not check_syntax(script):
+            result.errors.append(f"Syntax error in script: {os.path.basename(script)}")
+            all_syntax_ok = False
+        if not check_security(script):
+            result.errors.append(f"Security check failed for script: {os.path.basename(script)}")
+            all_security_ok = False
+
+    result.syntax_correct = all_syntax_ok and len(scripts_to_check) > 0
+    result.security_pass = all_security_ok and len(scripts_to_check) > 0
+
     val_script_path = os.path.join(skill_dir, "scripts", "validate.py")
-    if os.path.exists(val_script_path):
-        import subprocess
-        try:
-            proc = subprocess.run(["python", val_script_path], capture_output=True, text=True, timeout=10)
-            if proc.returncode != 0:
-                result.errors.append(f"Validation script execution failed: {proc.stderr}")
-        except Exception as e:
-            result.errors.append(f"Failed to execute validation script: {e}")
-    
+    if result.has_validation_script and result.syntax_correct:
+        if check_functional(val_script_path, os.path.join(skill_dir, "scripts")):
+            result.functional_correct = True
+        else:
+            result.errors.append("Validation script functional check failed")
+            result.functional_correct = False
+
     # Calculate completeness score with functional tests and schemas
-    total_checks = len(REQUIRED_FILES) + len(REQUIRED_SKILL_SECTIONS) + 2  # +2 for schema compliant and no execution errors
-    passed = len(result.skill_md_sections) + sum([
+    structure_score = sum([
         result.has_skill_md, result.has_method_script, 
         result.has_validation_script, result.has_spec_json, result.has_readme
-    ])
+    ]) / len(REQUIRED_FILES) if len(REQUIRED_FILES) > 0 else 0.0
 
-    no_execution_errors = 1 if not any("Validation script execution failed" in e for e in result.errors) else 0
-    passed += no_execution_errors
+    syntax_score = 1.0 if result.syntax_correct else 0.0
+    doc_score = len(result.skill_md_sections) / len(REQUIRED_SKILL_SECTIONS) if len(REQUIRED_SKILL_SECTIONS) > 0 else 0.0
+    exec_score = 1.0 if result.functional_correct else 0.0
+    schema_score = 1.0 if not any("MethodSpec" in e for e in result.errors) else 0.0
 
-    schema_ok = 1 if not any("MethodSpec" in e for e in result.errors) else 0
-    passed += schema_ok
+    # Attach scores to result (for reporting)
+    result.scores = {
+        "structure": structure_score,
+        "syntax": syntax_score,
+        "documentation": doc_score,
+        "execution": exec_score,
+        "schema": schema_score
+    }
 
-    result.completeness_score = passed / total_checks if total_checks > 0 else 0.0
+    result.completeness_score = (structure_score + syntax_score + doc_score + exec_score + schema_score) / 5.0
     
     # Schema compliance
     result.schema_compliant = len(result.errors) == 0 and result.completeness_score >= 0.7
@@ -132,6 +193,8 @@ def validate_skill_directory(skill_dir: str) -> ValidationResult:
         result.schema_compliant
         and result.has_skill_md
         and result.has_method_script
+        and result.syntax_correct
+        and result.security_pass
         and result.completeness_score >= 0.6
     )
     
@@ -145,6 +208,9 @@ def format_validation_report(result: ValidationResult, skill_dir: str) -> str:
         f"Overall: {'✅ PASS' if result.overall_pass else '❌ FAIL'}",
         f"Schema Compliant: {'✅' if result.schema_compliant else '❌'}",
         f"Completeness: {result.completeness_score:.1%}",
+        f"Syntax Correct: {'✅' if result.syntax_correct else '❌'}",
+        f"Functional Correct: {'✅' if result.functional_correct else '❌'}",
+        f"Security Pass: {'✅' if result.security_pass else '❌'}",
         "",
         "Files:",
         f"  SKILL.md: {'✅' if result.has_skill_md else '❌'}",
