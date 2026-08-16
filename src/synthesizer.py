@@ -2,7 +2,9 @@
 import json
 import logging
 from dataclasses import dataclass, field, asdict
-from typing import Optional
+from typing import Optional, Dict, Any
+import time
+from functools import wraps
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +58,21 @@ class MethodSpec:
     year: int = 0
 
 
-def synthesize_from_content(paper_content: dict, method_name: str = "") -> MethodSpec:
+
+
+
+
+def synthesize_from_content(paper_content: Dict[str, Any], method_name: str = "") -> MethodSpec:
     """
     Synthesize a MethodSpec from extracted paper content.
     In production, this would call an LLM. Here we use heuristic extraction.
+
+    Args:
+        paper_content: The dictionary representation of the parsed paper.
+        method_name: Optional override for the method name.
+
+    Returns:
+        A structured MethodSpec.
     """
     sections = paper_content.get("sections", [])
     equations = paper_content.get("equations", [])
@@ -116,15 +129,60 @@ def synthesize_from_content(paper_content: dict, method_name: str = "") -> Metho
 
 
 def spec_to_dict(spec: MethodSpec) -> dict:
-    """Serialize MethodSpec to dict."""
+    """Serialize MethodSpec to dict.
+
+    Args:
+        spec: The MethodSpec to serialize.
+
+    Returns:
+        A dictionary representation of the MethodSpec.
+    """
     return asdict(spec)
 
 
 def save_spec(spec: MethodSpec, path: str):
-    """Save MethodSpec to JSON."""
+    """Save MethodSpec to JSON.
+
+    Args:
+        spec: The MethodSpec to save.
+        path: The file path to save the JSON data to.
+    """
     with open(path, 'w') as f:
         json.dump(spec_to_dict(spec), f, indent=2)
     logger.info(f"Saved method spec to {path}")
+
+
+
+
+class SynthesizerStage:
+    """Stage 2: Method synthesis."""
+
+    def __init__(self, config=None):
+        from src.config import PipelineConfig
+        self.config = config or PipelineConfig()
+
+    def run(self, stage_input: Dict[str, Any]) -> MethodSpec:
+        """
+        Run the synthesis stage on the given input content.
+
+        Args:
+            stage_input: The dictionary representation of the PaperContent.
+
+        Returns:
+            A structured MethodSpec.
+        """
+        retries = self.config.retry_attempts
+        backoff = self.config.retry_backoff
+
+        for i in range(retries):
+            try:
+                return synthesize_from_content(stage_input)
+            except Exception as e:
+                if i == retries - 1:
+                    raise
+                logger.warning(f"Attempt {i+1} failed: {e}. Retrying in {backoff ** i} seconds...")
+                time.sleep(backoff ** i)
+
 
 
 if __name__ == "__main__":

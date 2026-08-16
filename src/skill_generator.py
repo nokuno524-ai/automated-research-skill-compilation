@@ -3,6 +3,7 @@ import json
 import os
 import logging
 from dataclasses import dataclass, asdict
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -77,13 +78,22 @@ def test_basic():
     {test_code}
     print("✓ Basic test passed")
 
+
 if __name__ == "__main__":
     test_basic()
     print("All tests passed!")
 '''
 
 
-def generate_skill_md(spec: dict) -> str:
+def generate_skill_md(spec: Dict[str, Any]) -> str:
+    """Generate SKILL.md content from MethodSpec dict.
+
+    Args:
+        spec: The MethodSpec dictionary.
+
+    Returns:
+        The generated SKILL.md content as a string.
+    """
     """Generate SKILL.md content from MethodSpec dict."""
     eqs = spec.get("key_equations", [])
     equations = "\n".join(f"- `{eq}`" for eq in eqs) if eqs else "None extracted"
@@ -127,8 +137,15 @@ def generate_skill_md(spec: dict) -> str:
     )
 
 
-def generate_method_script(spec: dict) -> str:
-    """Generate Python implementation script from MethodSpec."""
+def generate_method_script(spec: Dict[str, Any]) -> str:
+    """Generate Python implementation script from MethodSpec.
+
+    Args:
+        spec: The MethodSpec dictionary.
+
+    Returns:
+        The generated Python script as a string.
+    """
     name = spec.get("name", "Method")
     equations = spec.get("key_equations", [])
     
@@ -159,8 +176,15 @@ def generate_method_script(spec: dict) -> str:
     )
 
 
-def generate_validation_script(spec: dict) -> str:
-    """Generate validation/test script."""
+def generate_validation_script(spec: Dict[str, Any]) -> str:
+    """Generate validation/test script.
+
+    Args:
+        spec: The MethodSpec dictionary.
+
+    Returns:
+        The generated validation script as a string.
+    """
     name = spec.get("name", "Method")
     class_name = name.replace(" ", "").replace("-", "") + "Module"
     test_code = f"model = {class_name}()\n    x = torch.randn(2, 10)\n    out = model(x)\n    assert out.shape[0] == 2"
@@ -171,8 +195,16 @@ def generate_validation_script(spec: dict) -> str:
     )
 
 
-def generate_skill_directory(spec: dict, output_dir: str):
-    """Generate a complete skill directory."""
+def generate_skill_directory(spec: Dict[str, Any], output_dir: str) -> str:
+    """Generate a complete skill directory.
+
+    Args:
+        spec: The MethodSpec dictionary.
+        output_dir: The directory to write the skill to.
+
+    Returns:
+        The path to the generated output directory.
+    """
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(os.path.join(output_dir, "scripts"), exist_ok=True)
     os.makedirs(os.path.join(output_dir, "references"), exist_ok=True)
@@ -206,7 +238,27 @@ def generate_skill_directory(spec: dict, output_dir: str):
         f.write(readme)
     
     logger.info(f"Skill directory generated at {output_dir}")
+    return output_dir
 
+
+
+class SkillGeneratorStage:
+    """Stage 3: Skill artifact generation."""
+
+    def __init__(self, output_dir: str):
+        self.output_dir = output_dir
+
+    def run(self, stage_input: Dict[str, Any]) -> str:
+        """
+        Run the skill generation stage.
+
+        Args:
+            stage_input: The MethodSpec dictionary.
+
+        Returns:
+            The output directory path.
+        """
+        return generate_skill_directory(stage_input, self.output_dir)
 
 if __name__ == "__main__":
     from synthesizer import synthesize_from_content

@@ -8,7 +8,7 @@ def test_pipeline_failure_recovery(monkeypatch):
     from src import synthesizer
     def mock_synthesize(*args, **kwargs):
         raise ValueError("Simulated synthesis failure")
-    monkeypatch.setattr(synthesizer, "synthesize_from_content", mock_synthesize)
+    monkeypatch.setattr(synthesizer.SynthesizerStage, "run", mock_synthesize)
 
     with tempfile.TemporaryDirectory() as temp_dir:
         result = run_pipeline("examples/attention_paper.md", temp_dir)
@@ -33,6 +33,26 @@ def test_stage_isolation_extraction(mock_paper_content):
 def test_stage_isolation_synthesis(mock_paper_content):
     from src.synthesizer import synthesize_from_content
     from src.extractor import content_to_dict
-    spec = synthesize_from_content(content_to_dict(mock_paper_content))
+    from src import synthesizer
+    spec = synthesizer.SynthesizerStage().run(content_to_dict(mock_paper_content))
     assert spec.name == "Mock Title"
     assert spec.summary == "Mock abstract."
+
+
+def test_end_to_end_pipeline_paper1():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        result = run_pipeline("tests/fixtures/paper1.md", temp_dir)
+        assert "error" not in result
+        assert result["stages"]["extraction"]["title"] == "Minimal Model Architecture"
+        assert result["stages"]["synthesis"]["category"] == "architecture"
+        assert result["stages"]["validation"]["overall_pass"] is True
+        assert result["stages"]["validation"]["syntax_correct"] is True
+        assert result["stages"]["validation"]["functional_correct"] is True
+
+def test_end_to_end_pipeline_paper2():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        result = run_pipeline("tests/fixtures/paper2.md", temp_dir)
+        assert "error" not in result
+        assert result["stages"]["extraction"]["title"] == "Training Strategy Optimization"
+        assert result["stages"]["synthesis"]["category"] == "optimization"
+        assert result["stages"]["validation"]["overall_pass"] is True
