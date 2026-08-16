@@ -3,7 +3,7 @@ import sys
 import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-from extractor import parse_markdown_paper, parse_arxiv_html, extract_arxiv_id
+from extractor import parse_markdown_paper, parse_arxiv_html, extract_arxiv_id, ExtractorStage
 
 
 def test_parse_markdown_paper_abstract_extraction():
@@ -41,3 +41,20 @@ def test_parse_malformed_pdf_mock():
     assert content.title == ""
     assert content.abstract == ""
     assert len(content.sections) == 0
+
+
+def test_extractor_stage_interface():
+    stage = ExtractorStage()
+    md = "# Title\n\n## Abstract\nAbstract text."
+    content = stage.run(md, is_html=False)
+    assert content.title == "Title"
+    assert content.abstract == "Abstract text."
+
+def test_extractor_stage_invalid_input():
+    stage = ExtractorStage()
+    with pytest.raises(ValueError):
+        stage.run(None)
+    with pytest.raises(ValueError):
+        stage.run(123)
+    with pytest.raises(ValueError):
+        stage.run("")

@@ -52,7 +52,14 @@ class PaperContent:
 
 
 def extract_arxiv_id(url_or_id: str) -> str:
-    """Extract arXiv ID from URL or return as-is."""
+    """Extract arXiv ID from URL or return as-is.
+
+    Args:
+        url_or_id: The URL or arXiv ID string.
+
+    Returns:
+        The extracted arXiv ID, or the original string if no pattern matches.
+    """
     patterns = [
         r'arxiv\.org/abs/(\d+\.\d+)',
         r'arxiv\.org/pdf/(\d+\.\d+)',
@@ -67,7 +74,18 @@ def extract_arxiv_id(url_or_id: str) -> str:
 
 
 def parse_arxiv_html(html: str, url: str = "") -> PaperContent:
-    """Parse arXiv HTML into structured PaperContent."""
+    """Parse arXiv HTML into structured PaperContent.
+
+    Args:
+        html: The HTML string to parse.
+        url: The URL or arXiv ID of the paper.
+
+    Returns:
+        Structured representation of the paper's content.
+    """
+    if not html or not isinstance(html, str):
+        raise ValueError("Invalid html input")
+
     content = PaperContent(url=url)
     
     # Extract title
@@ -112,7 +130,18 @@ def parse_arxiv_html(html: str, url: str = "") -> PaperContent:
 
 
 def parse_markdown_paper(md_text: str, url: str = "") -> PaperContent:
-    """Parse a markdown-formatted paper into PaperContent."""
+    """Parse a markdown-formatted paper into PaperContent.
+
+    Args:
+        md_text: The markdown text to parse.
+        url: The URL or arXiv ID of the paper.
+
+    Returns:
+        Structured representation of the paper's content.
+    """
+    if not md_text or not isinstance(md_text, str):
+        raise ValueError("Invalid md_text input")
+
     content = PaperContent(url=url)
     
     lines = md_text.split('\n')
@@ -167,15 +196,41 @@ def parse_markdown_paper(md_text: str, url: str = "") -> PaperContent:
 
 
 def content_to_dict(content: PaperContent) -> dict:
-    """Serialize PaperContent to dict."""
+    """Serialize PaperContent to dict.
+
+    Args:
+        content: The PaperContent object to serialize.
+
+    Returns:
+        A dictionary representation of the PaperContent.
+    """
     return asdict(content)
 
 
 def save_content(content: PaperContent, path: str):
-    """Save PaperContent to JSON."""
+    """Save PaperContent to JSON.
+
+    Args:
+        content: The PaperContent object to save.
+        path: The file path to save the JSON data to.
+    """
     with open(path, 'w') as f:
         json.dump(content_to_dict(content), f, indent=2)
     logger.info(f"Saved paper content to {path}")
+
+
+class ExtractorStage:
+    """Stage 1: Content extraction."""
+    def run(self, stage_input: str, is_html: bool = False, url: str = "") -> PaperContent:
+        """
+        Run the extraction stage on the given input text.
+
+        Args:
+            stage_input: The markdown or HTML content of the paper.
+            is_html: Whether the input is HTML instead of Markdown.
+            url: The URL or arXiv ID of the paper.
+        """
+        return parse_arxiv_html(stage_input, url) if is_html else parse_markdown_paper(stage_input, url)
 
 
 if __name__ == "__main__":

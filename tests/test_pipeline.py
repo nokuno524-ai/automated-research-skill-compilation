@@ -6,16 +6,17 @@ import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from extractor import parse_markdown_paper, content_to_dict, extract_arxiv_id
-from synthesizer import synthesize_from_content
-from skill_generator import generate_skill_directory
-from validator import validate_skill_directory, format_validation_report
+
+from src.extractor import ExtractorStage, content_to_dict, extract_arxiv_id
+from src.synthesizer import SynthesizerStage, spec_to_dict
+from src.skill_generator import SkillGeneratorStage
+from src.validator import ValidatorStage, format_validation_report
 
 
 def test_extractor():
     """Test paper content extraction."""
     sample = open(os.path.join(os.path.dirname(__file__), '..', 'examples', 'attention_paper.md')).read()
-    content = parse_markdown_paper(sample, url="arxiv.org/abs/1706.03762")
+    content = ExtractorStage().run(sample, url="arxiv.org/abs/1706.03762")
     
     assert content.title == "Attention Is All You Need", f"Title: {content.title}"
     assert len(content.sections) > 0, "No sections extracted"
@@ -27,8 +28,8 @@ def test_extractor():
 def test_synthesizer():
     """Test method synthesis."""
     sample = open(os.path.join(os.path.dirname(__file__), '..', 'examples', 'lora_paper.md')).read()
-    content = parse_markdown_paper(sample, url="arxiv.org/abs/2106.09685")
-    spec = synthesize_from_content(content_to_dict(content))
+    content = ExtractorStage().run(sample, url="arxiv.org/abs/2106.09685")
+    spec = SynthesizerStage().run(content_to_dict(content))
     
     assert spec.name, "No method name"
     assert spec.category, "No category"
@@ -46,13 +47,13 @@ def test_full_pipeline():
         paper_path = os.path.join(examples_dir, paper_file)
         sample = open(paper_path).read()
         
-        content = parse_markdown_paper(sample, url=f"arxiv.org/abs/0000.00000")
-        spec = synthesize_from_content(content_to_dict(content))
+        content = ExtractorStage().run(sample, url=f"arxiv.org/abs/0000.00000")
+        spec = SynthesizerStage().run(content_to_dict(content))
         
         out_dir = tempfile.mkdtemp(prefix=f"p2s_test_{paper_file.replace('.md', '')}_")
-        generate_skill_directory(json.loads(json.dumps(vars(spec))), out_dir)
+        SkillGeneratorStage(out_dir).run(spec_to_dict(spec))
         
-        result = validate_skill_directory(out_dir)
+        result = ValidatorStage().run(out_dir)
         report = format_validation_report(result, out_dir)
         
         print(f"\n{report}")

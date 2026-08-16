@@ -15,16 +15,25 @@ python src/cli.py examples/lora_paper.md -o output/lora-skill
 python tests/test_pipeline.py
 ```
 
+
 ## Architecture
 
 ```
-Paper → Content Extraction → Method Synthesis → Skill Generation → Validation
++----------------+      +------------------+      +------------------+      +----------------+
+|  Stage 1       |      |  Stage 2         |      |  Stage 3         |      |  Stage 4       |
+|  Content       | ---> |  Method          | ---> |  Skill           | ---> |  Validation    |
+|  Extraction    |      |  Synthesis       |      |  Generation      |      |                |
++----------------+      +------------------+      +------------------+      +----------------+
+| Input: Text    |      | Input: dict      |      | Input: MethodSpec|      | Input: dir path|
+| Output: dict   |      | Output:          |      | Output: dir path |      | Output: Report |
+| (PaperContent) |      | MethodSpec       |      | (Skill Artifact) |      | (Validation)   |
++----------------+      +------------------+      +------------------+      +----------------+
 ```
 
-1. **Content Extraction** (`src/extractor.py`): Parse markdown/HTML papers into structured content. Includes proper multiline abstract processing.
-2. **Method Synthesis** (`src/synthesizer.py`): Extract method specifications from content via text-search categorizations.
-3. **Skill Generation** (`src/skill_generator.py`): Generate SKILL.md, valid and dynamic scripts, and references.
-4. **Validation** (`src/validator.py`): Validate generated skills against quality criteria, schema and execution.
+1. **Content Extraction** (`src/extractor.py`): Parse markdown/HTML papers into structured `PaperContent`.
+2. **Method Synthesis** (`src/synthesizer.py`): Extract `MethodSpec` from content via text-search categorizations (supports retry backoff).
+3. **Skill Generation** (`src/skill_generator.py`): Generate SKILL.md, Python implementation, validation scripts, and references returning output directory.
+4. **Validation** (`src/validator.py`): Validate generated skills against structural schema heuristics, executable sandboxed smoke tests, syntax, and security rules. Outputs a scored `ValidationResult`.
 
 ## Output Structure
 
